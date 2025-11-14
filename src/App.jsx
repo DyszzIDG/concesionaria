@@ -6,15 +6,18 @@ const DB = {
     try {
       const result = await window.storage.get(key);
       return result ? JSON.parse(result.value) : null;
-    } catch {
+    } catch (error) {
+      console.error(`Error obteniendo ${key}:`, error);
       return null;
     }
   },
   async set(key, value) {
     try {
-      await window.storage.set(key, JSON.stringify(value));
+      const result = await window.storage.set(key, JSON.stringify(value));
+      console.log(`Guardado exitoso: ${key}`, result);
       return true;
-    } catch {
+    } catch (error) {
+      console.error(`Error guardando ${key}:`, error);
       return false;
     }
   },
@@ -22,7 +25,8 @@ const DB = {
     try {
       const result = await window.storage.list(prefix);
       return result?.keys || [];
-    } catch {
+    } catch (error) {
+      console.error(`Error listando ${prefix}:`, error);
       return [];
     }
   }
@@ -345,20 +349,33 @@ function Vehiculos() {
   }, []);
 
   const loadVehiculos = async () => {
-    const keys = await DB.list('vehiculo:');
-    const items = await Promise.all(
-      keys.map(async key => await DB.get(key))
-    );
-    setVehiculos(items.filter(Boolean));
+    try {
+      const keys = await DB.list('vehiculo:');
+      console.log('Keys encontradas:', keys);
+      const items = await Promise.all(
+        keys.map(async key => await DB.get(key))
+      );
+      console.log('Vehículos cargados:', items);
+      setVehiculos(items.filter(Boolean));
+    } catch (error) {
+      console.error('Error cargando vehículos:', error);
+      setVehiculos([]);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const id = editingId || `vehiculo:${Date.now()}`;
     const vehiculo = { ...form, id };
-    await DB.set(id, vehiculo);
-    await loadVehiculos();
-    resetForm();
+    console.log('Intentando guardar:', vehiculo);
+    const success = await DB.set(id, vehiculo);
+    if (success) {
+      await loadVehiculos();
+      resetForm();
+      alert('Vehículo guardado exitosamente');
+    } else {
+      alert('Error al guardar el vehículo. Por favor intenta nuevamente.');
+    }
   };
 
   const handleEdit = (vehiculo) => {
@@ -417,51 +434,59 @@ function Vehiculos() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVehiculos.map(v => (
-          <div key={v.id} className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:scale-105 border-2 border-gray-100">
-            <div className="h-48 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20"></div>
-              <Car className="w-32 h-32 text-white opacity-40 relative z-10" />
+      {filteredVehiculos.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-2xl shadow-lg">
+          <Car className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 text-lg">No hay vehículos registrados</p>
+          <p className="text-gray-400 text-sm">Haz clic en "Agregar Vehículo" para comenzar</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredVehiculos.map(v => (
+            <div key={v.id} className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:scale-105 border-2 border-gray-100">
+              <div className="h-48 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20"></div>
+                <Car className="w-32 h-32 text-white opacity-40 relative z-10" />
+              </div>
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-xl font-bold text-gray-800">{v.marca} {v.modelo}</h3>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    v.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+                    v.estado === 'vendido' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {v.estado}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-gray-600 text-sm">Año: <span className="font-semibold">{v.año}</span></p>
+                  <p className="text-gray-600 text-sm">{v.kilometraje} km</p>
+                </div>
+                <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
+                  ${parseInt(v.precio).toLocaleString()}
+                </p>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleEdit(v)}
+                    className="flex-1 flex items-center justify-center space-x-1 bg-blue-100 text-blue-600 py-2 rounded-xl hover:bg-blue-200 transition-all font-semibold"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Editar</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(v.id)}
+                    className="flex-1 flex items-center justify-center space-x-1 bg-red-100 text-red-600 py-2 rounded-xl hover:bg-red-200 transition-all font-semibold"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Eliminar</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="p-5">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="text-xl font-bold text-gray-800">{v.marca} {v.modelo}</h3>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  v.estado === 'disponible' ? 'bg-green-100 text-green-700' :
-                  v.estado === 'vendido' ? 'bg-red-100 text-red-700' :
-                  'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {v.estado}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-gray-600 text-sm">Año: <span className="font-semibold">{v.año}</span></p>
-                <p className="text-gray-600 text-sm">{v.kilometraje} km</p>
-              </div>
-              <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
-                ${parseInt(v.precio).toLocaleString()}
-              </p>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleEdit(v)}
-                  className="flex-1 flex items-center justify-center space-x-1 bg-blue-100 text-blue-600 py-2 rounded-xl hover:bg-blue-200 transition-all font-semibold"
-                >
-                  <Edit className="w-4 h-4" />
-                  <span>Editar</span>
-                </button>
-                <button
-                  onClick={() => handleDelete(v.id)}
-                  className="flex-1 flex items-center justify-center space-x-1 bg-red-100 text-red-600 py-2 rounded-xl hover:bg-red-200 transition-all font-semibold"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Eliminar</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {showModal && (
         <Modal title={editingId ? 'Editar Vehículo' : 'Nuevo Vehículo'} onClose={resetForm}>
