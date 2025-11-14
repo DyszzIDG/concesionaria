@@ -4,8 +4,15 @@ import { Car, Users, Wrench, DollarSign, FileText, Calendar, BarChart3, LogOut, 
 const DB = {
   async get(key) {
     try {
-      const result = await window.storage.get(key);
-      return result ? JSON.parse(result.value) : null;
+      // Verificar si estamos en Claude.ai con window.storage
+      if (typeof window.storage !== 'undefined') {
+        const result = await window.storage.get(key);
+        return result ? JSON.parse(result.value) : null;
+      } else {
+        // Fallback a localStorage para uso fuera de Claude.ai
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : null;
+      }
     } catch (error) {
       console.error(`Error obteniendo ${key}:`, error);
       return null;
@@ -13,9 +20,15 @@ const DB = {
   },
   async set(key, value) {
     try {
-      const result = await window.storage.set(key, JSON.stringify(value));
-      console.log(`Guardado exitoso: ${key}`, result);
-      return true;
+      if (typeof window.storage !== 'undefined') {
+        const result = await window.storage.set(key, JSON.stringify(value));
+        console.log(`Guardado exitoso: ${key}`, result);
+        return true;
+      } else {
+        localStorage.setItem(key, JSON.stringify(value));
+        console.log(`Guardado exitoso en localStorage: ${key}`);
+        return true;
+      }
     } catch (error) {
       console.error(`Error guardando ${key}:`, error);
       return false;
@@ -23,11 +36,36 @@ const DB = {
   },
   async list(prefix) {
     try {
-      const result = await window.storage.list(prefix);
-      return result?.keys || [];
+      if (typeof window.storage !== 'undefined') {
+        const result = await window.storage.list(prefix);
+        return result?.keys || [];
+      } else {
+        // Simular list() con localStorage
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(prefix)) {
+            keys.push(key);
+          }
+        }
+        return keys;
+      }
     } catch (error) {
       console.error(`Error listando ${prefix}:`, error);
       return [];
+    }
+  },
+  async delete(key) {
+    try {
+      if (typeof window.storage !== 'undefined') {
+        await window.storage.delete(key);
+      } else {
+        localStorage.removeItem(key);
+      }
+      return true;
+    } catch (error) {
+      console.error(`Error eliminando ${key}:`, error);
+      return false;
     }
   }
 };
@@ -59,7 +97,7 @@ export default function SistemaConcesionaria() {
   };
 
   const handleLogout = async () => {
-    await window.storage.delete('current-user');
+    await DB.delete('current-user');
     setUser(null);
     setView('login');
   };
@@ -364,16 +402,30 @@ function Vehiculos() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const id = editingId || `vehiculo:${Date.now()}`;
-    const vehiculo = { ...form, id };
-    console.log('Intentando guardar:', vehiculo);
-    const success = await DB.set(id, vehiculo);
-    if (success) {
-      await loadVehiculos();
-      resetForm();
-      alert('Vehículo guardado exitosamente');
-    } else {
-      alert('Error al guardar el vehículo. Por favor intenta nuevamente.');
+    try {
+      const id = editingId || `vehiculo:${Date.now()}`;
+      const vehiculo = { ...form, id };
+      console.log('Intentando guardar:', vehiculo);
+      
+      // Validar que todos los campos requeridos tengan valores
+      if (!form.marca || !form.modelo || !form.año || !form.precio || !form.color || !form.kilometraje) {
+        alert('Por favor completa todos los campos requeridos');
+        return;
+      }
+      
+      const success = await DB.set(id, vehiculo);
+      if (success) {
+        console.log('✅ Guardado exitoso');
+        await loadVehiculos();
+        resetForm();
+        alert('Vehículo guardado exitosamente');
+      } else {
+        console.error('❌ DB.set retornó false');
+        alert('Error al guardar el vehículo. Revisa la consola para más detalles.');
+      }
+    } catch (error) {
+      console.error('❌ Error en handleSubmit:', error);
+      alert('Error al guardar: ' + error.message);
     }
   };
 
@@ -385,7 +437,7 @@ function Vehiculos() {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar este vehículo?')) {
-      await window.storage.delete(id);
+      await DB.delete(id);
       await loadVehiculos();
     }
   };
@@ -601,7 +653,7 @@ function Clientes() {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar este cliente?')) {
-      await window.storage.delete(id);
+      await DB.delete(id);
       await loadClientes();
     }
   };
@@ -934,7 +986,7 @@ function Servicios() {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar este servicio?')) {
-      await window.storage.delete(id);
+      await DB.delete(id);
       await loadData();
     }
   };
@@ -1089,7 +1141,7 @@ function Citas() {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar esta cita?')) {
-      await window.storage.delete(id);
+      await DB.delete(id);
       await loadCitas();
     }
   };
