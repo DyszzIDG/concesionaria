@@ -340,8 +340,7 @@ function Vehiculos() {
     estado: 'disponible',
     tipo: 'sedan',
     color: '',
-    kilometraje: '',
-    vin: ''
+    kilometraje: ''
   });
 
   useEffect(() => {
@@ -394,7 +393,7 @@ function Vehiculos() {
   const resetForm = () => {
     setForm({
       marca: '', modelo: '', año: '', precio: '', estado: 'disponible',
-      tipo: 'sedan', color: '', kilometraje: '', vin: ''
+      tipo: 'sedan', color: '', kilometraje: ''
     });
     setEditingId(null);
     setShowModal(false);
@@ -560,14 +559,6 @@ function Vehiculos() {
                 <option value="vendido">Vendido</option>
               </select>
             </div>
-            <input
-              type="text"
-              placeholder="VIN (Número de Serie)"
-              value={form.vin}
-              onChange={(e) => setForm({...form, vin: e.target.value})}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              required
-            />
             <button
               type="submit"
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 font-bold transition-all"
